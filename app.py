@@ -287,6 +287,75 @@ def borrow_history():
         "history": history
     }), 200
 
+@app.route('/overdue', methods=['GET'])
+def overdue_books():
+
+    today = date.today()
+
+    overdue = BorrowRecord.query.filter(
+        BorrowRecord.returned == False,
+        BorrowRecord.due_date < today
+    ).all()
+
+    books = []
+
+    for record in overdue:
+
+        books.append({
+            "borrow_id": record.id,
+            "book": record.book.title,
+            "borrower_name": record.borrower_name,
+            "borrower_email": record.borrower_email,
+            "borrow_date": str(record.borrow_date),
+            "due_date": str(record.due_date)
+        })
+
+    return jsonify({
+        "success": True,
+        "count": len(books),
+        "overdue_books": books
+    }), 200
+
+@app.route('/fine/<int:borrow_id>', methods=['GET'])
+def calculate_fine(borrow_id):
+
+    borrow = BorrowRecord.query.get(borrow_id)
+
+    if not borrow:
+        return jsonify({
+            "success": False,
+            "message": "Borrow record not found"
+        }), 404
+
+    if borrow.returned:
+        return jsonify({
+            "success": True,
+            "message": "Book already returned",
+            "fine": 0
+        }), 200
+
+    today = date.today()
+
+    if today <= borrow.due_date:
+        return jsonify({
+            "success": True,
+            "late_days": 0,
+            "fine": 0
+        }), 200
+
+    late_days = (today - borrow.due_date).days
+
+    fine = late_days * 10
+
+    return jsonify({
+        "success": True,
+        "borrow_id": borrow.id,
+        "book": borrow.book.title,
+        "borrower": borrow.borrower_name,
+        "late_days": late_days,
+        "fine": fine
+    }), 200
+
 # Get Single Book
 @app.route('/books/<int:id>', methods=['GET'])
 def get_book(id):
